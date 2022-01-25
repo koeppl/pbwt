@@ -1,0 +1,12 @@
+[package]
+name = "rlbwttransform"
+version = "0.1.0"
+authors = ["Dominik Köppl <git@dkppl.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.4.3"
+more-asserts = "0.2.1"
+# clap = "3.0.0-beta.2"

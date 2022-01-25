@@ -26,8 +26,8 @@ typedef struct listNode {
 
 typedef struct chainNode {
 	uint64_t rootHash;
-	long long leftHash;
-	long long rightHash;
+	uint64_t leftHash;
+	uint64_t rightHash;
 	int size;
 	struct chainNode *succ;
 } chainNode;
@@ -40,9 +40,10 @@ void updatePermDiv(int column[], int oldPerm[], int oldDiv[]);
 
 treeNode *createTree(int div[], int columnNum);
 int nodeCompare(const void *x, const void *y);
-unsigned long long hashTree(treeNode *root);
+uint64_t hashTree(treeNode *root);
 void printRules(FILE *filePtr);
 
+void printGrammar(FILE *filePtr);
 
 int height = 358660;
 int cap_height = 358660;
@@ -93,10 +94,10 @@ int main() {
 
 	fprintf(stderr, "Startup\n");
 	
-	for (int columnNum = 0; readMatrixColumn(column) == height; columnNum++) {
+	for (int columnNum = 0; columnNum < 30 && readMatrixColumn(column) == height; columnNum++) {
 		//printArray(column, stdout);
 
-		printPBWTColumn(column, perm, stdout);
+		/* printPBWTColumn(column, perm, stdout); */
 
 		/* printf("\n %d PERM = ", columnNum); */
 		/* printArray(perm, stdout); */
@@ -105,12 +106,12 @@ int main() {
 		/* printf("\n"); */
 
 		treeNode *root = createTree(div, columnNum);
-		unsigned long long hash = hashTree(root);
+		uint64_t hash = hashTree(root);
 
 		freeTree(root);
 
 		if (collisionFlag == 0) {
-			fprintf(stdout, "%i: %lli\n\n", columnNum, hash);
+			fprintf(stderr, "%i: %lli\n\n", columnNum, hash);
 		} else {
 			fprintf(stderr, "\n\nConstruction Failed!\n\n");
 			return(1);
@@ -122,7 +123,8 @@ int main() {
 		updatePermDiv(column, perm, div);
 	}
 	
-	printRules(stdout);
+	/* printRules(stdout); */
+	printGrammar(stdout);
 
 	for (int x = 1; x < height; x++) {
 		free(global_leaf_list[x]);
@@ -284,11 +286,11 @@ int nodeCompare(const void *x, const void *y) {
 
 
 size_t hash_counter = 0;
-unsigned long long hashTree(treeNode *root) {
+uint64_t hashTree(treeNode *root) {
 	
 	if (root != NULL) {
-		long long leftHash = hashTree(root -> left);
-		long long rightHash = hashTree(root -> right);
+		uint64_t leftHash = hashTree(root -> left);
+		uint64_t rightHash = hashTree(root -> right);
 		
 		uint64_t rootHash;
 		/* uint64_t rootHash = */
@@ -310,9 +312,9 @@ unsigned long long hashTree(treeNode *root) {
 		rootHash =
 		(uint64_t)((9465872627808054177ULL * leftHash + 5191322160178139765ULL) % 18446744073709551557ULL) ^
 		(uint64_t)((5813985129306799692ULL * rightHash + 4065133683220091270ULL) % 9223372036854775421ULL) ^
-		(uint64_t)(((2460960945928696877ULL * ((long long) (root -> size)) + 227720850924467681ULL)) % 4611686018427387709ULL);
+		(uint64_t)(((2460960945928696877ULL * ((uint64_t) (root -> size)) + 227720850924467681ULL)) % 4611686018427387709ULL);
 		
-		chainNode *chainPtr = table[(rootHash % (long long) HASH_TABLE_SIZE)];
+		chainNode *chainPtr = table[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
 		
 		while (chainPtr != NULL) {
 			if (chainPtr -> rootHash == rootHash) {
@@ -333,8 +335,8 @@ unsigned long long hashTree(treeNode *root) {
 			node -> leftHash = leftHash;
 			node -> rightHash = rightHash;
 			node -> size = root -> size;
-			node -> succ = table[(rootHash % (long long) HASH_TABLE_SIZE)];
-			table[(rootHash % (long long) HASH_TABLE_SIZE)] = node;
+			node -> succ = table[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
+			table[(rootHash % (uint64_t) HASH_TABLE_SIZE)] = node;
 			hash_counter++;
 		}
 		
@@ -367,3 +369,18 @@ void printRules(FILE *filePtr) {
 	
 	return;
 }
+
+void printGrammar(FILE *filePtr) {
+	/* fprintf(filePtr, "digraph G {\n"); */
+	fprintf(filePtr, "#root\tsize\tleft\tright\n#invalid=%lu\n", (uint64_t)-1);
+
+	for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+		chainNode *chainPtr = table[i];
+
+		while(chainPtr != NULL) {
+			fprintf(filePtr, "%lu\t%d\t%lu\t%lu\n", chainPtr->rootHash, chainPtr->size,  chainPtr->leftHash, chainPtr->rightHash);
+			chainPtr = chainPtr -> succ;
+		}
+	}
+}
+
