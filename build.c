@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
+#include <assert.h>
 
 
 #define MIN(a, b) (a < b ? a : b)
@@ -66,35 +67,55 @@ void freeTree(treeNode *root) {
 	free(root);
 }
 
-int main() {
+void printDivArray(FILE* div_file, int* div_array) {
+	for(int i = 0; i < cap_height; ++i) {
+		uint32_t diff = abs(div_array[i] - div_array[i-1])<<1;
+		if(div_array[i] < div_array[i-1]) diff |= 1;
+		assert(diff < 1ULL<<30);
+		fwrite(&diff, sizeof(int32_t),  1, div_file);
+	}
+}
+
+int main(const int argc, const char *const argv[]) {
+	/* int maxcolumns = INT_MAX; */
 	if (scanf("%i", &height) != 1) {
 		return(1);
 	}
 	cap_height = height;
+	if(argc > 1) {
+		cap_height = atoi(argv[1]);
+		if(cap_height > height) {
+			cap_height = height;
+		}
+		fprintf(stderr, "Limiting #individuals to %d\n", cap_height);
+	}
 	
 	global_leaves = (treeNode**) malloc(height*sizeof(treeNode*));
 
 
-	int* perm = (int*) malloc(height*sizeof(int)); // suffix array like, colex 
-	int* div = (int*) malloc(height*sizeof(int)); // LCS array
-	newDiv = (int*) malloc(height*sizeof(int)); // LCS array
-	newPerm = (int*) malloc(height*sizeof(int)); // LCS array
+	int* perm = (int*) malloc(cap_height*sizeof(int)); // suffix array like, colex 
+	int* div = (int*) malloc(cap_height*sizeof(int)); // LCS array
+	newDiv = (int*) malloc(cap_height*sizeof(int)); // LCS array
+	newPerm = (int*) malloc(cap_height*sizeof(int)); // LCS array
 
-	global_leaf_list = (listNode**) malloc(sizeof(listNode*)*(height + 1));
-	for (int i = 1; i < height; i++) {
+	global_leaf_list = (listNode**) malloc(sizeof(listNode*)*(cap_height + 1));
+	for (int i = 1; i < cap_height; i++) {
 		global_leaf_list[i] = (listNode *) malloc(sizeof(listNode));
 	}
 	
-	for (int i = 0; i < height; i++) {
+	for (int i = 0; i < cap_height; i++) {
 		perm[i] = i;
 		div[i] = 0;
 	}
+
+	FILE* div_file = fopen("/yotta/pbwt/divarray","wb");
+
 	
 	int* column = (int*) malloc(height*sizeof(int));
 
 	fprintf(stderr, "Startup\n");
 	
-	for (int columnNum = 0; columnNum < 30 && readMatrixColumn(column) == height; columnNum++) {
+	for (int columnNum = 0; readMatrixColumn(column) == height; columnNum++) {
 		//printArray(column, stdout);
 
 		/* printPBWTColumn(column, perm, stdout); */
@@ -111,22 +132,25 @@ int main() {
 		freeTree(root);
 
 		if (collisionFlag == 0) {
-			fprintf(stderr, "%i: %lli\n\n", columnNum, hash);
+			/* fprintf(stderr, "%i: %lli\n\n", columnNum, hash); */
 		} else {
 			fprintf(stderr, "\n\nConstruction Failed!\n\n");
 			return(1);
 		}
-		if(columnNum % 10 == 0 ) {
+		if(columnNum % 100 == 0 ) {
 			fprintf(stderr, "Round %d\n", columnNum);
 		}
 		
 		updatePermDiv(column, perm, div);
+
+		printDivArray(div_file, div);
 	}
+	fclose(div_file);
 	
 	/* printRules(stdout); */
 	printGrammar(stdout);
 
-	for (int x = 1; x < height; x++) {
+	for (int x = 1; x < cap_height; x++) {
 		free(global_leaf_list[x]);
 		/* free(global_leaves[x]); */
 	}
@@ -224,7 +248,7 @@ void updatePermDiv(int column[], int oldPerm[], int oldDiv[]) {
 treeNode *createTree(int div[], int columnNum) {
 	
 	
-	for (int i = 0; i < height; i++) {
+	for (int i = 0; i < cap_height; i++) {
 		global_leaves[i] = (treeNode *) malloc(sizeof(treeNode));
 		global_leaves[i] -> left = NULL;
 		global_leaves[i] -> right = NULL;
@@ -233,20 +257,20 @@ treeNode *createTree(int div[], int columnNum) {
 	
 
 	global_leaf_list[0] = NULL;
-	global_leaf_list[height] = NULL;
+	global_leaf_list[cap_height] = NULL;
 	
-	for (int i = 1; i < height; i++) {
+	for (int i = 1; i < cap_height; i++) {
 		global_leaf_list[i] -> left = global_leaves[i - 1];
 		global_leaf_list[i] -> div = div[i];
 		global_leaf_list[i] -> right = global_leaves[i];
 	}
 	
-	for (int i = 1; i < height; i++) {
+	for (int i = 1; i < cap_height; i++) {
 		global_leaf_list[i] -> prec = global_leaf_list[i - 1];
 		global_leaf_list[i] -> succ = global_leaf_list[i + 1];
 	}
 	
-	qsort(&global_leaf_list[1], height - 1, sizeof(listNode *), nodeCompare);
+	qsort(&global_leaf_list[1], cap_height - 1, sizeof(listNode *), nodeCompare);
 	
 	for (int i = 1;; i++) {
 		treeNode *parent = (treeNode *) malloc(sizeof(treeNode));

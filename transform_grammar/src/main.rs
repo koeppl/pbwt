@@ -23,7 +23,7 @@ fn main() {
     //     Some(filename) => File::open(filename).unwrap()
 	// };
     let reader = io::stdin();
-    let writer = io::stdout();
+    let mut writer = io::stdout();
 
     struct HashGrammar {
         name : u64,
