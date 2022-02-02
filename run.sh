@@ -10,7 +10,7 @@ function die {
 make
 for threshold in 0.1 0.08 0.05 0.03 0.01; do
 	echo "Threshold: $threshold"
-	./pbwt.x -i /yotta/pbwt/durbin.txt
+	./pbwt.x -t "$threshold" -i /yotta/pbwt/durbin.txt
 done
 
 

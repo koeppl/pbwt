@@ -9,15 +9,17 @@
 #include <stdbool.h>
 
 
-size_t g_limit_individuals = 0;
-size_t g_number_of_individuals = 0;
+size_t g_limit_individuals = 0; //@ limiting the number of individuals = height of the PBWT, taking only the first `g_limit_individuals` ones
+size_t g_number_of_individuals = 0; //@ the total height of the matrix, determined by the third line read from the input
 
+//@ error handling
 bool die_errno(const char* str) {
 	fprintf(stderr, "%s: %s\n", str, strerror(errno));
 	exit(1);
 	return true;
 }
 
+//@ error handling
 bool die(const char* str) {
 	fprintf(stderr, "%s\n", str);
 	exit(1);
@@ -25,32 +27,36 @@ bool die(const char* str) {
 }
 
 
+//@ if matrixColumn == NULL : allocate it by determining #individuals, which is used in the main routine to set `g_number_of_individuals`
 size_t readMatrixLine(FILE* input, int** matrixColumn, size_t* number_of_individuals) {
 	char* line = NULL;
-	size_t line_capacity = 0;
+	size_t line_capacity = 0; //@not needed
 	int line_length = 0;
 	if((line_length = getline(&line, &line_capacity, input)) == -1) {
 		if(line != NULL) { free(line); }
-		return 0;
-		/* die("could not get line from input"); */
+		return 0; //@ end of file
 	}
 
 	size_t column = 0;
 	size_t i = 0;
 	//@ an entry has the form 'SITE:   0        8.51469239e-06     0.118007104 <actual data>'
-	//so drop the first 4 columns
-	for(; column < 4 && i < (size_t)line_length; ++i) {
+	//@ so drop the first 4 columns
+	for(; i < (size_t)line_length; ++i) {
 		if(line[i] == ' ' || line[i] == '\t') {
 			while(line[i] == ' ' || line[i] == '\t') {
 				++i;
 			}
 			++column;
+			if(column >= 4) { break; }
 		}
 	}
+
+	//@ getline does not drop the delimiters like newline symbols at the end
 	size_t end_line = line_length;
 	while(end_line > 0 && (line[end_line-1] == '\r' || line[end_line-1] == '\n')) {
 		--end_line;
 	}
+	//@ if this is the first call, we assume that matrixColumn == NULL, and we allocate it
 	if(*matrixColumn == NULL) {
 		*number_of_individuals = end_line-i;
 		*matrixColumn = (int*) malloc(*number_of_individuals*sizeof(int));
@@ -72,12 +78,7 @@ size_t readMatrixLine(FILE* input, int** matrixColumn, size_t* number_of_individ
 }
 
 
-
-
-#define MIN(a, b) (a < b ? a : b)
-
 #define HASH_TABLE_SIZE 35866000
-
 
 typedef struct treeNode {
 	struct treeNode *left;
@@ -87,6 +88,7 @@ typedef struct treeNode {
 	int end;
 } treeNode;
 
+//@ garbage collection for the Cartesian tree nodes
 treeNode** g_gargabe_nodes = NULL;
 size_t g_gargabe_nodes_length = 0;
 
@@ -124,9 +126,6 @@ typedef struct chainNode {
 size_t g_interval_count = 0;
 int printIntervals(treeNode *v, int PBWTColumn[], FILE *filePtr) {
 #define PURPLE		-1
-	/* if( v == NULL) { */
-	/* 	return VOID; */
-	/* } */
 	if (v -> left == NULL && v -> right == NULL) {
 		for (size_t i = v -> start; i < (size_t) v -> end; i++) {
 			assert(i+1 < g_limit_individuals);
@@ -293,7 +292,11 @@ int main(const int argc, char *const argv[]) {
 		}
 		readMatrixLine(infile, &matrixColumn, &g_number_of_individuals);
 		if(g_number_of_individuals == 0) { die("Number of individuals is zero!"); }
-		if(g_limit_individuals == 0) { g_limit_individuals = g_number_of_individuals; }
+		if(g_limit_individuals == 0 || g_limit_individuals > g_number_of_individuals) { g_limit_individuals = g_number_of_individuals; }
+		fprintf(out_log_file, "#individuals : %zu\n", g_number_of_individuals);
+		fprintf(out_log_file, "#individuals to process (-c flag): %zu\n", g_limit_individuals);
+
+
 		fclose(infile);
 		infile = fopen(infilename, "r");
 		for(size_t i = 0; i < 2; ++i){
@@ -304,20 +307,6 @@ int main(const int argc, char *const argv[]) {
 			}
 		}
 	}
-
-
-	/* #<{(| int maxcolumns = INT_MAX; |)}># */
-	/* if (scanf("%i", &g_number_of_individuals) != 1) { */
-	/* 	return(1); */
-	/* } */
-	/* g_limit_individuals = g_number_of_individuals; */
-	/* if(argc > 1) { */
-	/* 	g_limit_individuals = atoi(argv[1]); */
-	/* 	if(g_limit_individuals > g_number_of_individuals) { */
-	/* 		g_limit_individuals = g_number_of_individuals; */
-	/* 	} */
-	/* 	fprintf(stderr, "Limiting #individuals to %d\n", g_limit_individuals); */
-	/* } */
 	
 	g_leaves = (treeNode**) malloc(g_limit_individuals*sizeof(treeNode*));
 	for(size_t i = 0; i < g_limit_individuals; ++i) {
@@ -378,15 +367,22 @@ int main(const int argc, char *const argv[]) {
 			/* printf("\n"); */
 		}
 
-		treeNode *root = createTree(div, processedColumns);
-		if(out_hash_file != NULL) {
-			uint64_t hash = hashTree(root);
-			if(g_collision_flag == 0) {
-				if(flag_verbose) { fprintf(out_log_file, "%zu: %lu\n\n", processedColumns, hash); }
-			} else {
-				fprintf(stderr, "\n\nConstruction Failed!\n\n");
-				return(1);
+
+		if(out_hash_file || out_interval_file) { //@ should we compute the Cartesian trees?
+			treeNode *root = createTree(div, processedColumns);
+			if(out_hash_file) {
+				uint64_t hash = hashTree(root);
+				if(g_collision_flag == 0) {
+					if(flag_verbose) { fprintf(out_log_file, "%zu: %lu\n\n", processedColumns, hash); }
+				} else {
+					fprintf(stderr, "\n\nConstruction Failed!\n\n");
+					return(1);
+				}
 			}
+			if(out_interval_file) {
+				printIntervals(root, PBWTColumn, out_interval_file);
+			}
+			clean_garbage_nodes(); //@ clean up the constructed Cartesian tree for this column
 		}
 
 		for(size_t i = 0; i < g_limit_individuals; i++) {
@@ -402,20 +398,14 @@ int main(const int argc, char *const argv[]) {
 				}
 			}
 		}
-
-		if(out_interval_file) {
-			printIntervals(root, PBWTColumn, out_interval_file);
-		}
-
-		clean_garbage_nodes();
-		/* freeTree(root); */
 		
 		updatePermDiv(matrixColumn, perm, div);
+
 		if(out_divarray_file) {
 			printDivArray(out_divarray_file, div);
 		}
 
-		if(processedColumns % 50 == 0 ) {
+		if(processedColumns % 200 == 0 ) {
 			fprintf(out_log_file, "Processed/Read: %zu/%zu\r", processedColumns, columnNum);
 			fflush(out_log_file);
 		}
@@ -502,9 +492,8 @@ void printPBWTColumn(int matrixColumn[], int perm[], FILE *filePtr) {
 
 
 void updatePermDiv(int matrixColumn[], int oldPerm[], int oldDiv[]) {
-	/* int newPerm[g_limit_individuals]; */
-	/* int newDiv[g_limit_individuals]; */
-	
+#define MIN(a, b) (a < b ? a : b)
+
 	int count0 = 0;
 	int lcs = 0;
 	
