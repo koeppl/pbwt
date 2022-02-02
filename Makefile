@@ -1,7 +1,7 @@
 CPPFILE=build.c
 CC = gcc
-MYCXXFLAGS  = -O3 -march=native -mtune=native
-#MYCXXFLAGS  = -ggdb -Wall -pedantic -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC 
+MYCXXFLAGS  = -Wall -Wextra -pedantic -O3 -march=native -mtune=native
+MYCXXFLAGS  = -ggdb -Wall -Wextra -pedantic -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC 
 TARGET = pbwt.x
 all: $(TARGET)
 

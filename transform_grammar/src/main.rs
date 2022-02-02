@@ -10,17 +10,21 @@ use std::io::BufReader;
 
 fn main() {
      let matches = clap_app!(myapp =>
-         (@arg input: -i "Sets the input file to use")
-         (@arg output: -o "Sets the output file to use")
+         (@arg input:  -i +takes_value "Sets the input file to use")
+         (@arg output: -o +takes_value "Sets the output file to use")
      ).get_matches();
     
      let reader : Box<dyn BufRead> =  match matches.value_of("input") {
          None => Box::new(BufReader::new(io::stdin())),
          Some(filename) => Box::new(BufReader::new(File::open(filename).unwrap()))
        };
-     let mut writer : Box<dyn std::io::Write> = match matches.value_of("input") {
+     let mut writer : Box<dyn std::io::Write> = match matches.value_of("output") {
          None => Box::new(io::stdout()),
-         Some(filename) => Box::new(File::open(filename).unwrap())
+        Some(filename) => {
+            // info!("filename: {}", filename);
+            let path = std::path::Path::new(filename);
+            Box::new(std::fs::File::create(&path).unwrap()) as Box<dyn std::io::Write>
+        }
        };
      // let reader = io::stdin();
      // let mut writer = io::stdout();

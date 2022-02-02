@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+
 
 
 size_t g_limit_individuals = 0; //@ limiting the number of individuals = height of the PBWT, taking only the first `g_limit_individuals` ones
@@ -123,6 +125,9 @@ typedef struct chainNode {
 	struct chainNode *succ;
 } chainNode;
 
+chainNode *g_hashtable[HASH_TABLE_SIZE] = {NULL};
+int g_collision_flag = 0;
+
 size_t g_interval_count = 0;
 int printIntervals(treeNode *v, int PBWTColumn[], FILE *filePtr) {
 #define PURPLE		-1
@@ -162,10 +167,26 @@ int nodeCompare(const void *x, const void *y);
 uint64_t hashTree(treeNode *root);
 void printRules(FILE *filePtr);
 
-void printGrammar(FILE *filePtr);
 
-chainNode *table[HASH_TABLE_SIZE] = {NULL};
-int g_collision_flag = 0;
+void printGrammar(FILE *filePtr, FILE* out_log_file) {
+	/* fprintf(filePtr, "digraph G {\n"); */
+	fprintf(filePtr, "#root\tsize\tleft\tright\n#invalid=%lu\n", (uint64_t)-1);
+	size_t rules_count = 0;
+
+	for (size_t i = 0; i < HASH_TABLE_SIZE; i++) {
+		chainNode *chainPtr = g_hashtable[i];
+
+		while(chainPtr != NULL) {
+			fprintf(filePtr, "%lu\t%d\t%lu\t%lu\n", chainPtr->rootHash, chainPtr->size,  chainPtr->leftHash, chainPtr->rightHash);
+			chainPtr = chainPtr -> succ;
+			++rules_count;
+		}
+	}
+	fprintf(out_log_file, "Number of Grammar Rules: %zu\n", rules_count);
+}
+
+
+
 
 int* newPerm;
 int* newDiv;
@@ -203,10 +224,12 @@ int main(const int argc, char *const argv[]) {
 	FILE* out_divarray_file = NULL;
 	FILE* out_interval_file = NULL;
 	FILE* out_log_file = stdout;
+	const char* matrixfilename = NULL;
+	FILE* out_matrix_file = NULL;
 	double flag_threshold = 0.0;
 	{
 		int c;
-		while((c = getopt(argc, argv, "i:h:d:g:n:vc:l:m:t:")) != -1) { 
+		while((c = getopt(argc, argv, "i:h:d:g:n:vc:l:m:t:w:")) != -1) { 
 			switch (c) {
 				case 't': 
 					errno = 0;
@@ -218,7 +241,7 @@ int main(const int argc, char *const argv[]) {
 					g_limit_individuals = strtoul(optarg, NULL, 10);
 					if(errno != 0) { die_errno("could not parse g_limit_individuals"); }
 					break;
-				case 'm': 
+				case 'w': 
 					errno = 0;
 					column_limit = strtoul(optarg, NULL, 10);
 					if(errno != 0) { die_errno("could not parse column_limit"); }
@@ -233,7 +256,7 @@ int main(const int argc, char *const argv[]) {
 					break;
 				case 'h':
 					out_hash_file = fopen(optarg, "w");
-					if(out_hash_file == NULL) { die_errno("could not open outfile for hash table"); }
+					if(out_hash_file == NULL) { die_errno("could not open outfile for hash g_hashtable"); }
 					break;
 				case 'l':
 					out_log_file = fopen(optarg, "w");
@@ -246,6 +269,11 @@ int main(const int argc, char *const argv[]) {
 				case 'n':
 					out_interval_file = fopen(optarg, "w");
 					if(out_interval_file == NULL) { die_errno("could not open outfile for interval"); }
+					break;
+				case 'm': 
+					matrixfilename = optarg;
+					out_matrix_file = fopen(matrixfilename, "w");
+					if(out_matrix_file == NULL) { die_errno("could not open outfile for matrix"); }
 					break;
 				case '?':
 					if (optopt == 'c')
@@ -262,16 +290,16 @@ int main(const int argc, char *const argv[]) {
 		die(
 				"No infile given!\n\n"
 	"\
-	parameters: \n\
+parameters: \n\
 	-v : [flag] verbose flag \n\
 	-t : [double] threshold t: if less than t% of all entries of the column are 1, it is discarded. (default = 0 = disabled) \n\
 	-i : [filename] input binary matrix file \n\
-	-n : [filename] outfile for the intervals \n\
 	-d : [filename] outfile for div array \n\
 	-l : [filename] write the log to a log file instead of stdout \n\
-	-h : [filename] output the hash table storing the DAG-compressed Cartesian trees \n\
+	-h : [filename] output the hash g_hashtable storing the DAG-compressed Cartesian trees \n\
 	-n : [filename] output the interval representation of the Cartesion trees \n\
-	-m : [int] limit the number of columns to process \n\
+	-m : [filename] file to write the input matrix without the columns removed by the threshold (the matrix is stored rowwise by individuals)\n\
+	-w : [int] limit the number of columns to process \n\
 	-c : [int] limit the number of individuals to process \n\
 	"
 	"");
@@ -307,11 +335,27 @@ int main(const int argc, char *const argv[]) {
 			}
 		}
 	}
+
+	/* if(transpose_directory != NULL) { */
+	/* 	const size_t filename_length = strlen(transpose_directory + 100); */
+	/* 	char*const filename = (char*) malloc(filename_length*sizeof(char)); */
+    /*  */
+	/* 	transpose_file = (FILE**) malloc(g_limit_individuals*sizeof(FILE*)); */
+	/* 	for(size_t i = 0; i < g_limit_individuals; ++i) { */
+	/* 		if(snprintf(filename, filename_length, "%s/row_%zu.txt", transpose_directory, i) < 0) { */
+	/* 			die("could not create filename."); */
+	/* 		} */
+	/* 		transpose_files[i] = fopen(filename, "w"); */
+	/* 		assert(transpose_files[i] != NULL); */
+	/* 	} */
+	/* 	free(filename); */
+	/* } */
 	
 	g_leaves = (treeNode**) malloc(g_limit_individuals*sizeof(treeNode*));
 	for(size_t i = 0; i < g_limit_individuals; ++i) {
 		g_leaves[i] = (treeNode *) malloc(sizeof(treeNode));
 	}
+
 
 
 	int* perm = (int*) malloc(g_limit_individuals*sizeof(int)); // suffix array like, colex 
@@ -340,6 +384,7 @@ int main(const int argc, char *const argv[]) {
 	
 	size_t processedColumns = 0;
 	size_t columnNum = 0;
+	size_t div_array_total_size = 0; //@ theoretical bit-compact size of the div array 
 	assert(matrixColumn != NULL);
 	for(; columnNum < column_limit; columnNum++) {
 		const size_t read_values = readMatrixLine(infile, &matrixColumn, &g_number_of_individuals);
@@ -353,6 +398,15 @@ int main(const int argc, char *const argv[]) {
 		if(count_ones < g_limit_individuals*flag_threshold) {
 			continue;
 		}
+		//@ from now on we only process columns above the threshold
+
+		if(out_matrix_file != NULL) {
+			for(size_t i = 0; i < g_limit_individuals; ++i) {
+				const char byte = matrixColumn[i] == 0 ? '0' : '1';
+				fwrite(&byte, 1, 1, out_matrix_file);
+			}
+		}
+
 		number_of_ones += count_ones;
 
 
@@ -404,6 +458,9 @@ int main(const int argc, char *const argv[]) {
 		if(out_divarray_file) {
 			printDivArray(out_divarray_file, div);
 		}
+		for(size_t i = 0; i < g_limit_individuals; i++) {
+			 div_array_total_size += 31-__builtin_clz((unsigned int)div[i]+1);
+		}
 
 		if(processedColumns % 200 == 0 ) {
 			fprintf(out_log_file, "Processed/Read: %zu/%zu\r", processedColumns, columnNum);
@@ -415,14 +472,15 @@ int main(const int argc, char *const argv[]) {
 	fprintf(out_log_file, "Processed Columns: %zu\n", processedColumns);
 	fprintf(out_log_file, "Total Columns: %zu\n", columnNum);
 	fprintf(out_log_file, "PBWT Character Runs: %zu\n", number_of_pbwt_runs);
+	fprintf(out_log_file, "Div Array Theoretical Bit-Compact Total Size: %zu\n", div_array_total_size);
 	
 	if(out_hash_file) {
 		/* printRules(out_hash_file); */
-		printGrammar(out_hash_file);
+		printGrammar(out_hash_file, out_log_file);
 	}
 
 	if(out_interval_file) {
-		fprintf(stderr, "#intervals = %zu\n", g_interval_count);
+		fprintf(stderr, "# Cartesian Tree Intervals = %zu\n", g_interval_count);
 	}
 
 	fclose(infile);
@@ -431,8 +489,17 @@ int main(const int argc, char *const argv[]) {
 	if(out_divarray_file) { fclose(out_divarray_file); }
 	if(out_interval_file) { fclose(out_interval_file); }
 	if(out_log_file != stdout) { fclose(out_log_file); }
+	if(out_matrix_file) { fclose(out_matrix_file); };
 
 	clean_garbage_nodes();
+
+	/* if(transpose_directory != NULL) { */
+	/* 	for(size_t i = 0; i < g_limit_individuals; ++i) { */
+	/* 		free(transpose_files[i]); */
+	/* 	} */
+	/* 	free(transpose_files); */
+	/* } */
+
 
 	for(size_t x = 0; x < g_limit_individuals; ++x) {
 		free(g_leaf_list[x]);
@@ -447,6 +514,37 @@ int main(const int argc, char *const argv[]) {
 	free(div);
 	free(newDiv);
 	free(newPerm);
+
+
+	//@ transpose matrix
+	if(matrixfilename != NULL) {
+		out_matrix_file = fopen(matrixfilename, "r");
+		fseek(out_matrix_file, 0L, SEEK_END);
+		const size_t matrix_file_size = ftell(out_matrix_file);
+		fprintf(out_log_file, "Matrix File Size: %zu\n", matrix_file_size);
+		assert(matrix_file_size == g_limit_individuals * processedColumns);
+		fseek(out_matrix_file, 0L, SEEK_SET);
+		char** matrix = (char**) malloc(g_limit_individuals*sizeof(char*));
+		for(size_t i = 0; i < g_limit_individuals; ++i) {
+			matrix[i] = (char*) malloc(processedColumns*sizeof(char));
+		}
+		for(size_t j = 0; j < processedColumns; ++j) {
+			for(size_t i = 0; i < g_limit_individuals; ++i) {
+				const int c =fgetc(out_matrix_file);
+				assert(c > 0);
+				matrix[i][j] = c;
+			}
+		}
+		fclose(out_matrix_file);
+		out_matrix_file = fopen(matrixfilename, "w");
+		for(size_t i = 0; i < g_limit_individuals; ++i) {
+			fwrite(matrix[i], 1, processedColumns, out_matrix_file);
+			free(matrix[i]);
+		}
+		fclose(out_matrix_file);
+		free(matrix);
+	}
+
 	return(0);
 }
 
@@ -623,7 +721,7 @@ uint64_t hashTree(treeNode *root) {
 		(uint64_t)((5813985129306799692ULL * rightHash + 4065133683220091270ULL) % 9223372036854775421ULL) ^
 		(uint64_t)(((2460960945928696877ULL * ((uint64_t) (root -> size)) + 227720850924467681ULL)) % 4611686018427387709ULL);
 		
-		chainNode *chainPtr = table[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
+		chainNode *chainPtr = g_hashtable[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
 		
 		while (chainPtr != NULL) {
 			if (chainPtr -> rootHash == rootHash) {
@@ -644,8 +742,8 @@ uint64_t hashTree(treeNode *root) {
 			node -> leftHash = leftHash;
 			node -> rightHash = rightHash;
 			node -> size = root -> size;
-			node -> succ = table[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
-			table[(rootHash % (uint64_t) HASH_TABLE_SIZE)] = node;
+			node -> succ = g_hashtable[(rootHash % (uint64_t) HASH_TABLE_SIZE)];
+			g_hashtable[(rootHash % (uint64_t) HASH_TABLE_SIZE)] = node;
 			hash_counter++;
 		}
 		
@@ -661,7 +759,7 @@ void printRules(FILE *filePtr) {
 	fprintf(filePtr, "digraph G {\n");
 	
 	for (size_t i = 0; i < HASH_TABLE_SIZE; i++) {
-		chainNode *chainPtr = table[i];
+		chainNode *chainPtr = g_hashtable[i];
 		
 		while (chainPtr != NULL) {
 			fprintf(filePtr, "%lx [label=\"%lx\\l%i\"]\n",
@@ -679,17 +777,4 @@ void printRules(FILE *filePtr) {
 	return;
 }
 
-void printGrammar(FILE *filePtr) {
-	/* fprintf(filePtr, "digraph G {\n"); */
-	fprintf(filePtr, "#root\tsize\tleft\tright\n#invalid=%lu\n", (uint64_t)-1);
-
-	for (size_t i = 0; i < HASH_TABLE_SIZE; i++) {
-		chainNode *chainPtr = table[i];
-
-		while(chainPtr != NULL) {
-			fprintf(filePtr, "%lu\t%d\t%lu\t%lu\n", chainPtr->rootHash, chainPtr->size,  chainPtr->leftHash, chainPtr->rightHash);
-			chainPtr = chainPtr -> succ;
-		}
-	}
-}
 
