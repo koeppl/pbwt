@@ -8,7 +8,7 @@ set -e
 #./convert.x /yotta/pbwt/durbin.txt >! /yotta/pbwt/travisformat.txt
 
 gcc -Wall -Wextra -pedantic -O3 build.c -o travis.x
-g++ -Wall -Wextra -pedantic -O3 convert.cpp -o convert.x
-g++ -Wall -Wextra -pedantic -O3 togrammar.cpp -o togrammar.x
+# g++ -Wall -Wextra -pedantic -O3 convert.cpp -o convert.x
+# g++ -Wall -Wextra -pedantic -O3 togrammar.cpp -o togrammar.x
 
 gcc -O0 -ggdb build.c -o travis.x

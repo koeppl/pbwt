@@ -5,6 +5,16 @@ function die {
 	echo "$1" >&2
 	exit 1
 }
+
+
+make
+for threshold in 0.1 0.08 0.05 0.03 0.01; do
+	echo "Threshold: $threshold"
+	./pbwt.x -i /yotta/pbwt/durbin.txt
+done
+
+
+exit 0
 ./make.sh
 
 for file in /yotta/pbwt/sparse /yotta/pbwt/subsampled; do
