@@ -1,29 +1,29 @@
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::path::Path;
 use std::collections::HashMap;
-use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
+use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::BufReader;
 #[macro_use] extern crate more_asserts;
 
-// #[macro_use] extern crate clap;
+#[macro_use] extern crate clap;
 
 
 fn main() {
-    // let matches = clap_app!(myapp =>
-    //     (@arg input: -i "Sets the input file to use")
-    //     (@arg output: -o "Sets the output file to use")
-    // ).get_matches();
-    //
-    // let reader = match matches.value_of("input") {
-    //     None => io::stdin(),
-    //     Some(filename) => File::open(filename).unwrap()
-	// };
-    // let writer = match matches.value_of("input") {
-    //     None => io::stdout(),
-    //     Some(filename) => File::open(filename).unwrap()
-	// };
-    let reader = io::stdin();
-    let mut writer = io::stdout();
+     let matches = clap_app!(myapp =>
+         (@arg input: -i "Sets the input file to use")
+         (@arg output: -o "Sets the output file to use")
+     ).get_matches();
+    
+     let reader : Box<dyn BufRead> =  match matches.value_of("input") {
+         None => Box::new(BufReader::new(io::stdin())),
+         Some(filename) => Box::new(BufReader::new(File::open(filename).unwrap()))
+       };
+     let mut writer : Box<dyn std::io::Write> = match matches.value_of("input") {
+         None => Box::new(io::stdout()),
+         Some(filename) => Box::new(File::open(filename).unwrap())
+       };
+     // let reader = io::stdin();
+     // let mut writer = io::stdout();
 
     struct HashGrammar {
         name : u64,

@@ -15,6 +15,8 @@ typedef struct treeNode {
 	struct treeNode *left;
 	struct treeNode *right;
 	int size;
+	int start;
+	int end;
 } treeNode;
 
 typedef struct listNode {
@@ -33,11 +35,42 @@ typedef struct chainNode {
 	struct chainNode *succ;
 } chainNode;
 
+int intervalCount = 0;
+int printIntervals(treeNode *v, int PBWTColumn[], FILE *filePtr) {
+#define PURPLE		-1
+#define VOID -2
+	/* if( v == NULL) { */
+	/* 	return VOID; */
+	/* } */
+	if (v -> left == NULL && v -> right == NULL) {
+		for (int i = v -> start; i < v -> end; i++) {
+			if (PBWTColumn[i] != PBWTColumn[i + 1]) {
+				fprintf(filePtr, "[%i, %i] ", v -> start, v -> end);
+				return(PURPLE);
+			}
+		}
+		
+		return(PBWTColumn[v -> start]);
+	}
+	assert(v -> left != NULL && v -> right != NULL);
+	
+	int leftColour = printIntervals(v -> left, PBWTColumn, filePtr);
+	int rightColour = printIntervals(v -> right, PBWTColumn, filePtr);
+	
+	if (leftColour == rightColour) {
+		return(leftColour);
+	}
+
+	fprintf(filePtr, "[%i, %i] ", v -> start, v -> end);
+	intervalCount++;
+	return(PURPLE);
+}
+
 
 int readMatrixColumn();
 void printArray(int array[], FILE *filePtr);
-void printPBWTColumn(int column[], int perm[], FILE *filePtr);
-void updatePermDiv(int column[], int oldPerm[], int oldDiv[]);
+void printPBWTColumn(int matrixColumn[], int perm[], FILE *filePtr);
+void updatePermDiv(int matrixColumn[], int oldPerm[], int oldDiv[]);
 
 treeNode *createTree(int div[], int columnNum);
 int nodeCompare(const void *x, const void *y);
@@ -111,14 +144,15 @@ int main(const int argc, const char *const argv[]) {
 	FILE* div_file = fopen("/yotta/pbwt/divarray","wb");
 
 	
-	int* column = (int*) malloc(height*sizeof(int));
+	int* matrixColumn = (int*) malloc(height*sizeof(int));
+	int* PBWTColumn = (int*) malloc(height*sizeof(int));
 
 	fprintf(stderr, "Startup\n");
 	
-	for (int columnNum = 0; readMatrixColumn(column) == height; columnNum++) {
-		//printArray(column, stdout);
+	for (int columnNum = 0; readMatrixColumn(matrixColumn) == height; columnNum++) {
+		//printArray(matrixColumn, stdout);
 
-		/* printPBWTColumn(column, perm, stdout); */
+		/* printPBWTColumn(matrixColumn, perm, stdout); */
 
 		/* printf("\n %d PERM = ", columnNum); */
 		/* printArray(perm, stdout); */
@@ -126,8 +160,14 @@ int main(const int argc, const char *const argv[]) {
 		/* printArray(div, stdout); */
 		/* printf("\n"); */
 
+
 		treeNode *root = createTree(div, columnNum);
-		uint64_t hash = hashTree(root);
+		/* uint64_t hash = hashTree(root); */
+
+		for (int i = 0; i < height; i++) {
+			PBWTColumn[i] = matrixColumn[perm[i]];
+		}
+		printIntervals(root, PBWTColumn, stdout);
 
 		freeTree(root);
 
@@ -140,15 +180,18 @@ int main(const int argc, const char *const argv[]) {
 		if(columnNum % 100 == 0 ) {
 			fprintf(stderr, "Round %d\n", columnNum);
 		}
-		
-		updatePermDiv(column, perm, div);
 
-		printDivArray(div_file, div);
+		
+		updatePermDiv(matrixColumn, perm, div);
+
+		/* printDivArray(div_file, div); */
 	}
 	fclose(div_file);
 	
 	/* printRules(stdout); */
-	printGrammar(stdout);
+	/* printGrammar(stdout); */
+
+	fprintf(stderr, "#intervals = %i\n", intervalCount);
 
 	for (int x = 1; x < cap_height; x++) {
 		free(global_leaf_list[x]);
@@ -157,7 +200,8 @@ int main(const int argc, const char *const argv[]) {
 	free(global_leaf_list);
 	free(global_leaves);
 
-	free(column);
+	free(PBWTColumn);
+	free(matrixColumn);
 	free(perm);
 	free(div);
 	free(newDiv);
@@ -166,16 +210,16 @@ int main(const int argc, const char *const argv[]) {
 }
 
 
-int readMatrixColumn(int column[]) {
+int readMatrixColumn(int matrixColumn[]) {
 	int i;
 	
 	for (i = 0; i < height; i++) {
-		const int ret = scanf("%i", &column[i]);
+		const int ret = scanf("%i", &matrixColumn[i]);
 		if(ret != 1) { 
 			break; 
 			fprintf(stderr, "wanted to read int, but found unparsable character: %c\n", getchar());
 		}
-		if(column[i] < 0 || column[i] > 1) {
+		if(matrixColumn[i] < 0 || matrixColumn[i] > 1) {
 			break;
 		}
 	}
@@ -196,10 +240,10 @@ void printArray(int array[], FILE *filePtr) {
 }
 
 
-void printPBWTColumn(int column[], int perm[], FILE *filePtr) {
+void printPBWTColumn(int matrixColumn[], int perm[], FILE *filePtr) {
 	
 	for (int i = 0; i < cap_height; i++) {
-		fprintf(filePtr, "%i ", column[perm[i]]);
+		fprintf(filePtr, "%i ", matrixColumn[perm[i]]);
 	}
 	
 	fprintf(filePtr, "\n");
@@ -208,7 +252,7 @@ void printPBWTColumn(int column[], int perm[], FILE *filePtr) {
 }
 
 
-void updatePermDiv(int column[], int oldPerm[], int oldDiv[]) {
+void updatePermDiv(int matrixColumn[], int oldPerm[], int oldDiv[]) {
 	/* int newPerm[cap_height]; */
 	/* int newDiv[cap_height]; */
 	
@@ -217,7 +261,7 @@ void updatePermDiv(int column[], int oldPerm[], int oldDiv[]) {
 	
 	for (int i = 0; i < cap_height; i++) {
 		lcs = MIN(lcs, oldDiv[i] + 1);
-		if (column[oldPerm[i]] == 0) {
+		if (matrixColumn[oldPerm[i]] == 0) {
 			newPerm[count0] = oldPerm[i];
 			newDiv[count0] = lcs;
 			count0++;
@@ -230,7 +274,7 @@ void updatePermDiv(int column[], int oldPerm[], int oldDiv[]) {
 
 	for (int i = 0; i < cap_height; i++) {
 		lcs = MIN(lcs, oldDiv[i] + 1);
-		if (column[oldPerm[i]] == 1) {
+		if (matrixColumn[oldPerm[i]] == 1) {
 			newPerm[count0 + count1] = oldPerm[i];
 			newDiv[count0 + count1] = lcs;
 			count1++;
@@ -253,9 +297,10 @@ treeNode *createTree(int div[], int columnNum) {
 		global_leaves[i] -> left = NULL;
 		global_leaves[i] -> right = NULL;
 		global_leaves[i] -> size = 1;
+		global_leaves[i] -> start = i;
+		global_leaves[i] -> end = i;
 	}
 	
-
 	global_leaf_list[0] = NULL;
 	global_leaf_list[cap_height] = NULL;
 	
@@ -283,6 +328,9 @@ treeNode *createTree(int div[], int columnNum) {
 			parent -> left = NULL;
 			parent -> right = NULL;
 		}
+
+		parent -> start = (global_leaf_list[i] -> left) -> start;
+		parent -> end   = (global_leaf_list[i] -> right) -> end;
 		
 		if (global_leaf_list[i] -> prec != NULL) {
 			(global_leaf_list[i] -> prec) -> right = parent;
