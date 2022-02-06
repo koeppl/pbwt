@@ -226,17 +226,17 @@ int main(const int argc, char *const argv[]) {
 	FILE* out_log_file = stdout;
 	const char* matrixfilename = NULL;
 	FILE* out_matrix_file = NULL;
-	double flag_threshold = 0.0;
+	double flag_sampling = 0.0;
 	{
 		int c;
-		while((c = getopt(argc, argv, "i:h:d:g:n:vc:l:m:t:w:")) != -1) { 
+		while((c = getopt(argc, argv, "i:h:d:g:n:vc:l:m:s:w:")) != -1) { 
 			switch (c) {
-				case 't': 
+				case 's': 
 					errno = 0;
-					flag_threshold = strtod(optarg, NULL);
-					if(errno != 0) { die_errno("could not parse flag_threshold"); }
+					flag_sampling = strtod(optarg, NULL);
+					if(errno != 0) { die_errno("could not parse flag_sampling"); }
 					break;
-				case 'c': 
+				case 'h': 
 					errno = 0;
 					g_limit_individuals = strtoul(optarg, NULL, 10);
 					if(errno != 0) { die_errno("could not parse g_limit_individuals"); }
@@ -254,7 +254,7 @@ int main(const int argc, char *const argv[]) {
 					infile = fopen(optarg, "r");
 					if(infile == NULL) { die_errno("could not open infile"); }
 					break;
-				case 'h':
+				case 'c':
 					out_hash_file = fopen(optarg, "w");
 					if(out_hash_file == NULL) { die_errno("could not open outfile for hash g_hashtable"); }
 					break;
@@ -292,15 +292,15 @@ int main(const int argc, char *const argv[]) {
 	"\
 parameters: \n\
 	-v : [flag] verbose flag \n\
-	-t : [double] threshold t: if less than t% of all entries of the column are 1, it is discarded. (default = 0 = disabled) \n\
+	-s : [double] sampling threshold s: if less than s% of all entries of the column are 1, it is discarded. (default = 0 = disabled) \n\
 	-i : [filename] input binary matrix file \n\
 	-d : [filename] outfile for div array \n\
 	-l : [filename] write the log to a log file instead of stdout \n\
-	-h : [filename] output the hash g_hashtable storing the DAG-compressed Cartesian trees \n\
-	-n : [filename] output the interval representation of the Cartesion trees \n\
-	-m : [filename] file to write the input matrix without the columns removed by the threshold (the matrix is stored rowwise by individuals)\n\
+	-c : [filename] output the hash g_hashtable storing the DAG-compressed Cartesian trees \n\
+	-n : [filename] output the interval representation of the Cartesian trees \n\
+	-m : [filename] file to write the input matrix without the columns removed by the threshold (the matrix is stored rowwise by individuals, i.e., the transpose of the orignal input)\n\
 	-w : [int] limit the number of columns to process \n\
-	-c : [int] limit the number of individuals to process \n\
+	-h : [int] limit the number of individuals to process (height of the PBWT matrix)\n\
 	"
 	"");
 
@@ -395,7 +395,7 @@ parameters: \n\
 		for(size_t i = 0; i < g_limit_individuals; ++i) {
 			if(matrixColumn[i] == 1) { ++count_ones; }
 		}
-		if(count_ones < g_limit_individuals*flag_threshold) {
+		if(count_ones < g_limit_individuals*flag_sampling) {
 			continue;
 		}
 		//@ from now on we only process columns above the threshold
