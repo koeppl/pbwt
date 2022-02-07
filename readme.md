@@ -7,7 +7,7 @@
  - [ShapedSLP](https://github.com/itomomoti/ShapedSlp) for encoding an SLP grammar such as RePair or SOLCA
 
 ## 🚀 Complete Test Run
-```
+```bash
 	git clone https://github.com/koeppl/pbwt
 	cd pbwt
 	wget http://dolomit.cs.tu-dortmund.de/tudocomp/pbwt_matrix.xz
@@ -42,4 +42,4 @@ The directory `transform_grammar` contains rust code that can be compiled via `c
 A sample dataset as input can be found at http://dolomit.cs.tu-dortmund.de/tudocomp/pbwt_matrix.xz
 
 ## 📚 References
-- Richard Durbin￼: Efficient haplotype matching and storage using the positional Burrows-Wheeler transform (PBWT). Bioinform. 30(9): 1266-1272 (2014)
+- Richard Durbin: Efficient haplotype matching and storage using the positional Burrows-Wheeler transform (PBWT). Bioinform. 30(9): 1266-1272 (2014)
