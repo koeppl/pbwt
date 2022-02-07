@@ -6,10 +6,13 @@ function die {
 	exit 1
 }
 
+#update file locations:
+file=/yotta/pbwt/durbin.txt
+
 function task {
 	echo "Threshold: $threshold"
 	# ./pbwt.x -t "$threshold" -i /yotta/pbwt/durbin.txt
-	./pbwt.x -i /yotta/pbwt/durbin.txt -t "$threshold" -d $file.$threshold.divarray -h $file.$threshold.grammar.txt -m $file.$threshold.matrix -n $file.$threshold.intervals
+	./pbwt.x -i "$file" -t "$threshold" -d $file.$threshold.divarray -h $file.$threshold.grammar.txt -m $file.$threshold.matrix -n $file.$threshold.intervals
 	#-w 2000
 	~/code/bigrepair/bigrepair $file.$threshold.matrix
 	~/code/shapedSlp/build/SlpEncBuild -i $file.$threshold.matrix -f Bigrepair -e ShapedSlpV2_Sd_SdMcl -o $file.$threshold.matrix.slp
@@ -22,7 +25,6 @@ function task {
 
 make
 
-file=/yotta/pbwt/durbin.txt
 mkdir -p log
 
 for threshold in 0.1 0.08 0.05 0.03 0.01; do
@@ -31,26 +33,4 @@ done
 wait
 
 
-
-exit 0
-./make.sh
-
-for file in /yotta/pbwt/sparse /yotta/pbwt/subsampled; do
-	[[ -r "$file.txt" ]] || die "cannot read $file.txt"
-
-
-	[[ -r "$file".tv.txt ]] || ./convert.x "$file".txt > "$file".tv.txt
-
-	for maxcols in 1000 2000 3000 4000 5000 6000 7000; do
-		maxcolfile="$file.$maxcols"
-		./travis.x "$maxcols" < "$file".tv.txt >! "$maxcolfile".grammar.txt
-
-		
-
-			# PlainSlp_32Fblc PlainSlp_FblcFblc PlainSlp_IblcFblc SelfShapedSlpV2_SdSd_Sd SelfShapedSlp_SdSd_Mcl SelfShapedSlp_SdSd_Sd ShapedSlpV2_Sd_SdMcl ShapedSlp_SdMclSd_SdMcl ShapedSlp_SdSdSd_SdMcl ShapedSlp_Status_SdMclSd_SdMcl; do
-		for i in ShapedSlpV2_Sd_SdMcl; do 
-			/home/niki/code/shapedSlp/build/SlpEncBuild -i "$maxcolfile".grammar.bin -f solca -e "$i" -o "$maxcolfile".grammar.slp.$i
-		done
-	done
-done
-
+# PlainSlp_32Fblc PlainSlp_FblcFblc PlainSlp_IblcFblc SelfShapedSlpV2_SdSd_Sd SelfShapedSlp_SdSd_Mcl SelfShapedSlp_SdSd_Sd ShapedSlpV2_Sd_SdMcl ShapedSlp_SdMclSd_SdMcl ShapedSlp_SdSdSd_SdMcl ShapedSlp_Status_SdMclSd_SdMcl
